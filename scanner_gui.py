@@ -11,25 +11,50 @@
 from PyQt5 import QtCore, QtGui, QtWidgets
 import re
 
-def match_array(iterator,type):
+special_symbols = {
+    ';':"SEMICOLON",
+    ":=":"ASSIGN",
+    "<":"LESSTHAN",
+    "=":"EQUAL",
+    "+":"PLUS",
+    "-":"MINUS",
+    "*":"MULT",
+    "/":"DIV",
+    "(":"OPENBRACKET",
+    ")":"CLOSEDBRACKET"
+}
+
+def match_array(iterator, type):
     matches = []
     for x in iterator:
-        matches.append([x,type])
+        matches.append([x, type])
     return matches
 
+
 def sortFunc(x):
-    return x[0].span()[0]+x[0].span()[1]*0.1
+    return x[0].span()[0] + x[0].span()[1] * 0.1
+
+def finalFormat(tokens):
+    final_tokens = []
+    for token in tokens:
+        if token[1] == "Reserved word":
+            final_tokens.append([token[0],token[0].upper()])
+        elif token[1] == "Special Symbol":
+            final_tokens.append([token[0],special_symbols[token[0]]])
+        else:
+            final_tokens.append([token[0],token[1]])
+    return final_tokens
+
 
 def format_tokens(tokens):
     final_tokens = []
     for token in tokens:
         if token[1] == 'Reserved word':
-            final_tokens.append([token[0].group(2), token[0].group(2)])
-        elif token[1] == 'Special Symbol':
-            final_tokens.append([token[0].group(1), token[0].group(1)])
+            final_tokens.append([token[0].group(2), token[1]])
         else:
             final_tokens.append([token[0].group(1), token[1]])
     return final_tokens
+
 
 def scan_to_tokens(lines):
     comment = re.sub("[{][^{}]*[}]", " ", lines)
@@ -56,237 +81,253 @@ def scan_to_tokens(lines):
 
     final_tokens = format_tokens(tokens)
     return final_tokens
- ############Parser####################
+
+
+############Parser####################
 import sys
 import os
+
 dirpath = os.getcwd()
 os.environ["PATH"] += os.pathsep + dirpath + os.pathsep + 'D:\\programs\\graphviz-2.38\\release\\bin'
 from graphviz import Digraph
-g = Digraph('Output_graph', format='png') 
+
+g = Digraph('Output_graph', format='png')
 token = ''
 index = 0
-tokens = [[],[]]
+tokens = [[], []]
+
+
 def parser():
-            global tokens
-            input_file = "outputFile.txt"
-            with open(input_file) as f:
-                content = f.readlines()
-                content = [x.strip() for x in content]
-            for i in range(len(content)):
-                index = content[i].find(',')
-                tokens[0].append(content[i][:index - 1].strip("'"))
-                tokens[1].append(content[i][index + 2:].strip("'"))
-            get_token()
-            stmt_seq()
-            
+    global tokens
+    input_file = "outputFile.txt"
+    with open(input_file) as f:
+        content = f.readlines()
+        content = [x.strip() for x in content]
+    for i in range(len(content)):
+        index = content[i].find(',')
+        tokens[0].append(content[i][:index - 1].strip("'"))
+        tokens[1].append(content[i][index + 2:].strip("'"))
+    get_token()
+    stmt_seq()
 
 
 def get_token():
-            global token
-            global index
-            if index == len(tokens[0]):
-                g.view()
-                return
-            if (tokens[1][index] == 'Identifier') or (tokens[1][index] == 'Number'):
+    global token
+    global index
+    if index == len(tokens[0]):
+        g.view()
+        return
+    if (tokens[1][index] == 'Identifier') or (tokens[1][index] == 'Number'):
 
-                token = tokens[1][index]
-                index += 1
-            else:
-                token = tokens[0][index]
+        token = tokens[1][index]
+        index += 1
+    else:
+        token = tokens[0][index]
 
-                index += 1
-            return
-
-node='1'
-nodes_list=[]
-nodeID={}
-flag=0
-def MakeNode(given_token,ass):
-
-            if (given_token == 'Identifier') or (given_token == 'Number'):
-                given = tokens[0][index-1]
-            else:
-                given = given_token
-                if given_token == ':=':
-                    given = 'assign'
+        index += 1
+    return
 
 
-            global node
-            node = chr(ord(node) + 1)
-            global flag
-            given+= '\n (' + str(flag) + ')'
-            current_flag=flag
-            flag +=1
-            nodeID[current_flag] = given
-            if given_token != ':=' and ass !=1:
-                g.node(given)
-            return current_flag
+node = '1'
+nodes_list = []
+nodeID = {}
+flag = 0
 
-def child(parent,childd,flag):
-            x=1
-            if nodeID[parent][:6]=='assign' and flag==1:
-                f1=nodeID[parent][:nodeID[parent].find('(')]
-                f2=nodeID[parent][nodeID[parent].find('('):]
-                nodeID[parent]=f1+nodeID[childd][:nodeID[childd].find('(')]+'\n'+f2
-                g.node(nodeID[parent])
-                return
 
-            token_parent=nodeID[parent]
-            token_child=nodeID[childd]
-            g.edge(token_parent,token_child)
+def MakeNode(given_token, ass):
+    if (given_token == 'Identifier') or (given_token == 'Number'):
+        given = tokens[0][index - 1]
+    else:
+        given = given_token
+        if given_token == ':=':
+            given = 'assign'
+
+    global node
+    node = chr(ord(node) + 1)
+    global flag
+    given += '\n (' + str(flag) + ')'
+    current_flag = flag
+    flag += 1
+    nodeID[current_flag] = given
+    if given_token != ':=' and ass != 1:
+        g.node(given)
+    return current_flag
+
+
+def child(parent, childd, flag):
+    x = 1
+    if nodeID[parent][:6] == 'assign' and flag == 1:
+        f1 = nodeID[parent][:nodeID[parent].find('(')]
+        f2 = nodeID[parent][nodeID[parent].find('('):]
+        nodeID[parent] = f1 + nodeID[childd][:nodeID[childd].find('(')] + '\n' + f2
+        g.node(nodeID[parent])
+        return
+
+    token_parent = nodeID[parent]
+    token_child = nodeID[childd]
+    g.edge(token_parent, token_child)
 
 
 def match(expected_token):
-            if expected_token==token:
-                get_token()
-            return
-sub=0
-def same_rank(element1,element2):
-            global sub
-            x=1
-            if element2==0:
-                return
-            token_element1=nodeID[element1]
-            token_element2 = nodeID[element2]
-            s = Digraph('subgraph'+str(sub))
-            sub+=1
-            s.graph_attr.update(rank='same')
-            s.node(token_element1,color='red')
-            s.node(token_element2,color='red')
-            g.edge(token_element1,token_element2)
-            g.subgraph(s)
+    if expected_token == token:
+        get_token()
+    return
+
+
+sub = 0
+
+
+def same_rank(element1, element2):
+    global sub
+    x = 1
+    if element2 == 0:
+        return
+    token_element1 = nodeID[element1]
+    token_element2 = nodeID[element2]
+    s = Digraph('subgraph' + str(sub))
+    sub += 1
+    s.graph_attr.update(rank='same')
+    s.node(token_element1, color='red')
+    s.node(token_element2, color='red')
+    g.edge(token_element1, token_element2)
+    g.subgraph(s)
+
 
 def stmt_seq():
-            temp=statement()
+    temp = statement()
 
-            first=temp
-            while token == ';':
-                match(token)
-                if (token != ';'):
-                    newtemp=statement()
-                    same_rank(temp,newtemp)
-                    temp=newtemp
-            return first
+    first = temp
+    while token == ';':
+        match(token)
+        if (token != ';'):
+            newtemp = statement()
+            same_rank(temp, newtemp)
+            temp = newtemp
+    return first
+
 
 def statement():
-            temp=0
-            if (token=='if'):
-                temp=if_stmt()
-            elif token == 'repeat':
-                temp =repeat_stmt()
-            elif token == 'read':
-                temp = read_stmt()
-            elif token == 'write':
-                temp = write_stmt()
-            elif (index != len(tokens[0])) and (tokens[0][index] == ':='):
-                temp = assign_stmt()
-            return temp
+    temp = 0
+    if (token == 'if'):
+        temp = if_stmt()
+    elif token == 'repeat':
+        temp = repeat_stmt()
+    elif token == 'read':
+        temp = read_stmt()
+    elif token == 'write':
+        temp = write_stmt()
+    elif (index != len(tokens[0])) and (tokens[0][index] == ':='):
+        temp = assign_stmt()
+    return temp
+
 
 def assign_stmt():
-            newtemp=0
-            temp=MakeNode(token,1)
-            match(token)
+    newtemp = 0
+    temp = MakeNode(token, 1)
+    match(token)
 
-            newtemp=MakeNode(token,0) # :=
-            match(token)
-            child(newtemp, temp,1)
-            child(newtemp, exp(),0 )
-            temp = newtemp
-            return temp
+    newtemp = MakeNode(token, 0)  # :=
+    match(token)
+    child(newtemp, temp, 1)
+    child(newtemp, exp(), 0)
+    temp = newtemp
+    return temp
+
 
 def read_stmt():
-            temp=MakeNode(token,0)
-            match(token)
-            child(temp,MakeNode(token,0),0 )
-            match(token)
-            return temp
+    temp = MakeNode(token, 0)
+    match(token)
+    child(temp, MakeNode(token, 0), 0)
+    match(token)
+    return temp
 
 
 def write_stmt():
-            temp=MakeNode(token,0)
-            match(token)
-            child(temp, exp(),0 )
-            return temp
+    temp = MakeNode(token, 0)
+    match(token)
+    child(temp, exp(), 0)
+    return temp
+
 
 def term():
-            temp = factor()
-            while (token == '*') or token =='/':
-                newTemp = MakeNode(token,0)
-                match(token)
-                child(newTemp, temp,0 )
-                child(newTemp, factor(),0 )
-                temp = newTemp
-            return temp
-
+    temp = factor()
+    while (token == '*') or token == '/':
+        newTemp = MakeNode(token, 0)
+        match(token)
+        child(newTemp, temp, 0)
+        child(newTemp, factor(), 0)
+        temp = newTemp
+    return temp
 
 
 def simple_exp():
-            temp = term()
-            while (token == '+') or (token == '-'):
-                newTemp = MakeNode(token,0)
-                match(token)
-                child(newTemp, temp,0 )
-                child(newTemp, term(),0 )
-                temp = newTemp
-            return temp
+    temp = term()
+    while (token == '+') or (token == '-'):
+        newTemp = MakeNode(token, 0)
+        match(token)
+        child(newTemp, temp, 0)
+        child(newTemp, term(), 0)
+        temp = newTemp
+    return temp
 
 
 def if_stmt():
-            newTemp = MakeNode(token,0)
-            match(token)
-            child(newTemp, exp(),0 )
-            match(token)
-            child(newTemp, stmt_seq(),0 )
-            if token == 'else':
-                match(token)
-                child(newTemp, stmt_seq(),0 )
-                match(token)
-                temp = newTemp
-            elif token == 'end':
-                match(token)
-                temp = newTemp
-            return temp
+    newTemp = MakeNode(token, 0)
+    match(token)
+    child(newTemp, exp(), 0)
+    match(token)
+    child(newTemp, stmt_seq(), 0)
+    if token == 'else':
+        match(token)
+        child(newTemp, stmt_seq(), 0)
+        match(token)
+        temp = newTemp
+    elif token == 'end':
+        match(token)
+        temp = newTemp
+    return temp
 
 
 def repeat_stmt():
-            newTemp = MakeNode(token,0)
-            match(token)
-            child(newTemp, stmt_seq(),0 )
-            match(token)
-            child(newTemp, exp(),0 )
-            temp = newTemp
-            return temp
+    newTemp = MakeNode(token, 0)
+    match(token)
+    child(newTemp, stmt_seq(), 0)
+    match(token)
+    child(newTemp, exp(), 0)
+    temp = newTemp
+    return temp
 
 
 def exp():
-            temp = simple_exp()
-            if (token == '<') or (token == '='):
-                newTemp = MakeNode(token,0)
-                match(token)
-                child(newTemp, temp,0)
-                child(newTemp, simple_exp(),0)
-                temp = newTemp
-            return temp
+    temp = simple_exp()
+    if (token == '<') or (token == '='):
+        newTemp = MakeNode(token, 0)
+        match(token)
+        child(newTemp, temp, 0)
+        child(newTemp, simple_exp(), 0)
+        temp = newTemp
+    return temp
 
 
 def factor():
-            temp=0
-            if token == '(':
-                match(token)
-                temp = exp()
-                match(token) #')'
-            elif token == 'Identifier':
-                newTemp = MakeNode(token,0)
-                match(token)
-                temp = newTemp
-            elif token == 'Number':
-                newTemp = MakeNode(token,0)
-                match(token)
-                temp = newTemp
+    temp = 0
+    if token == '(':
+        match(token)
+        temp = exp()
+        match(token)  # ')'
+    elif token == 'Identifier':
+        newTemp = MakeNode(token, 0)
+        match(token)
+        temp = newTemp
+    elif token == 'Number':
+        newTemp = MakeNode(token, 0)
+        match(token)
+        temp = newTemp
 
-            return temp
-        
- ############Parser####################
+    return temp
+
+
+############Parser####################
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
         MainWindow.setObjectName("MainWindow")
@@ -319,14 +360,16 @@ class Ui_MainWindow(object):
 
         def output_tokens():
             lines = self.textEdit.toPlainText()
-            text = scan_to_tokens(lines)
+            temp = scan_to_tokens(lines)
+            text = finalFormat(temp)
             for token in text:
                 self.textBrowser_2.append(str(token))
             with open('outputFile.txt', 'w') as filehandle:
                 for token in text:
                     token = str(token).strip('[ ]')
                     filehandle.write('%s\n' % token)
-            parser()    
+            parser()
+
         def clear():
             self.textBrowser_2.clear()
 
@@ -339,8 +382,10 @@ class Ui_MainWindow(object):
         self.pushButton.setText(_translate("MainWindow", "Start"))
         self.pushButton2.setText(_translate("MainWindow", "Clear"))
 
+
 if __name__ == "__main__":
     import sys
+
     app = QtWidgets.QApplication(sys.argv)
     MainWindow = QtWidgets.QMainWindow()
     ui = Ui_MainWindow()
